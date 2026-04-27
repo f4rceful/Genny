@@ -1,7 +1,7 @@
 import os
 import re
 from jinja2 import Environment, FileSystemLoader
-from utils.llm_client import call_llm
+from utils.llm_client import call_llm, get_model
 from utils.file_writer import write_artifact
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -46,7 +46,7 @@ def run(functional_req: str, run_id: str, src_code: str = "") -> dict:
         "Комментарии и docstring — на русском языке."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt)
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("tester"))
 
     parts = response.split("---REQUIREMENTS---", maxsplit=1)
     test_code = parts[0].strip()

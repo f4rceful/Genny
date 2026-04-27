@@ -2,7 +2,7 @@ import json
 import os
 import re
 from jinja2 import Environment, FileSystemLoader
-from utils.llm_client import call_llm
+from utils.llm_client import call_llm, get_model
 from utils.file_writer import write_artifact
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -34,7 +34,7 @@ def run(functional_req: str, non_functional_req: str, features: str, run_id: str
         "Никакого текста до или после JSON."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt)
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("architect"))
     raw_json = _extract_json(response)
 
     try:

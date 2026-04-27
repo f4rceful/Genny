@@ -12,3 +12,13 @@ class GenerateResponse(BaseModel):
     run_id: str
     status: str
     artifacts: list[str]
+
+
+class PatchRequest(BaseModel):
+    instruction: str
+
+
+class PatchResponse(BaseModel):
+    run_id: str
+    status: str
+    patched_files: list[str]

@@ -1,6 +1,7 @@
 import os
+import re
 from jinja2 import Environment, FileSystemLoader
-from utils.llm_client import call_llm
+from utils.llm_client import call_llm, get_model
 from utils.file_writer import write_artifact
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -19,7 +20,7 @@ def run(bt: str, bp: str, features: str, run_id: str) -> dict:
         "Соблюдай структуру и маркеры, указанные в задании."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt)
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("analyst"))
 
     parts = response.split("---SPLIT---", maxsplit=1)
     if len(parts) == 2:
@@ -39,3 +40,59 @@ def run(bt: str, bp: str, features: str, run_id: str) -> dict:
         "non_functional_req": non_functional_req,
         "functional_req": functional_req,
     }
+
+
+def _parse_docs(response: str) -> dict[str, str]:
+    docs: dict[str, str] = {}
+    pattern = r"---DOC:\s*(.+?)---\n(.*?)(?=---DOC:|$)"
+    for name, content in re.findall(pattern, response, re.DOTALL):
+        docs[name.strip()] = content.strip()
+    return docs
+
+
+def patch(instruction: str, run_id: str) -> list[str]:
+    """Update docs (NFR, FR, use-cases) based on a patch instruction."""
+    print(f"[AgentAnalyst:patch] instruction: {instruction!r}")
+
+    docs_dir = os.path.join("output", run_id, "docs")
+
+    def _read(name: str) -> str:
+        try:
+            with open(os.path.join(docs_dir, name), encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+    non_functional_req = _read("non-functional-req.md")
+    functional_req = _read("functional-req.md")
+    use_cases = _read("use-cases.md")
+
+    if not non_functional_req and not functional_req:
+        print("[AgentAnalyst:patch] WARNING: no docs found, skipping")
+        return []
+
+    template = _jinja_env.get_template("docs_patcher.j2")
+    user_prompt = template.render(
+        instruction=instruction,
+        non_functional_req=non_functional_req,
+        functional_req=functional_req,
+        use_cases=use_cases,
+    )
+
+    system_prompt = (
+        "Ты опытный бизнес-аналитик. "
+        "Вноси только минимально необходимые изменения в документацию. "
+        "Строго соблюдай маркеры ---DOC: name---. "
+        "Отвечай строго на русском языке."
+    )
+
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("analyst"))
+    updated = _parse_docs(response)
+
+    written: list[str] = []
+    for doc_name, content in updated.items():
+        write_artifact(run_id, f"docs/{doc_name}", content)
+        written.append(f"docs/{doc_name}")
+
+    print(f"[AgentAnalyst:patch] updated: {written}")
+    return written

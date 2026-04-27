@@ -7,8 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 
-from schemas import GenerateRequest, GenerateResponse
-from pipeline.runner import run_pipeline
+from schemas import GenerateRequest, GenerateResponse, PatchRequest, PatchResponse
+from pipeline.runner import run_pipeline, refine_pipeline
+from pipeline import agent_coder, agent_analyst
+from utils import state
 
 
 @asynccontextmanager
@@ -24,12 +26,14 @@ def _pipeline_task(bt: str, bp: str, features: str, run_id: str) -> None:
     try:
         run_pipeline(bt=bt, bp=bp, features=features, run_id=run_id)
     except Exception as e:
-        print(f"[main] Pipeline failed for run_id={run_id}: {e}")
+        # состояние уже записано в runner, просто логируем
+        print(f"[main] pipeline task ended with error for run_id={run_id}: {e}")
 
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(request: GenerateRequest, background_tasks: BackgroundTasks):
     run_id = str(uuid.uuid4())
+    state.write(run_id, "starting", step="queued")
     background_tasks.add_task(
         _pipeline_task,
         bt=request.bt,
@@ -40,20 +44,77 @@ async def generate(request: GenerateRequest, background_tasks: BackgroundTasks):
     return GenerateResponse(run_id=run_id, status="started", artifacts=[])
 
 
+@app.post("/refine/{run_id}", response_model=GenerateResponse)
+async def refine(run_id: str, background_tasks: BackgroundTasks):
+    run_dir = os.path.join("output", run_id)
+    if not os.path.isdir(run_dir):
+        raise HTTPException(status_code=404, detail="run_id not found")
+
+    info = state.read(run_id)
+    if info.get("status") == "running":
+        raise HTTPException(status_code=409, detail="Pipeline already running for this run_id")
+
+    def _refine_task():
+        try:
+            refine_pipeline(run_id)
+        except Exception as e:
+            print(f"[main] refine task ended with error for run_id={run_id}: {e}")
+
+    state.write(run_id, "running", step="refine: queued")
+    background_tasks.add_task(_refine_task)
+    return GenerateResponse(run_id=run_id, status="refining", artifacts=[])
+
+
+@app.post("/patch/{run_id}", response_model=PatchResponse)
+async def patch(run_id: str, request: PatchRequest):
+    run_dir = os.path.join("output", run_id)
+    if not os.path.isdir(run_dir):
+        raise HTTPException(status_code=404, detail="run_id not found")
+
+    info = state.read(run_id)
+    if info.get("status") == "running":
+        raise HTTPException(status_code=409, detail="Pipeline already running for this run_id")
+
+    if not request.instruction.strip():
+        raise HTTPException(status_code=422, detail="instruction cannot be empty")
+
+    state.write(run_id, "running", step="patch")
+    try:
+        patched_files = agent_coder.patch(instruction=request.instruction, run_id=run_id)
+        state.write(run_id, "running", step="patch-docs")
+        patched_docs = agent_analyst.patch(instruction=request.instruction, run_id=run_id)
+        state.write(run_id, "done", step="")
+    except Exception as e:
+        state.write(run_id, "failed", step="patch", error=f"{type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return PatchResponse(run_id=run_id, status="done", patched_files=patched_files + patched_docs)
+
+
 @app.get("/status/{run_id}")
 async def status(run_id: str):
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
-        return {"run_id": run_id, "status": "not_found", "files": []}
+        return {"run_id": run_id, "status": "not_found", "files": [], "step": "", "error": ""}
+
+    info = state.read(run_id)
 
     files = []
     for dirpath, _, filenames in os.walk(run_dir):
         for fname in filenames:
+            if fname.startswith("."):
+                continue
             full = os.path.join(dirpath, fname)
             rel = os.path.relpath(full, run_dir)
             files.append(rel)
 
-    return {"run_id": run_id, "status": "done" if files else "running", "files": sorted(files)}
+    return {
+        "run_id": run_id,
+        "status": info["status"],
+        "step": info.get("step", ""),
+        "error": info.get("error", ""),
+        "files": sorted(files),
+    }
 
 
 @app.get("/download/{run_id}")
@@ -67,6 +128,8 @@ async def download(run_id: str):
     with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_DEFLATED) as zf:
         for dirpath, _, filenames in os.walk(run_dir):
             for fname in filenames:
+                if fname.startswith("."):
+                    continue
                 full = os.path.join(dirpath, fname)
                 arcname = os.path.relpath(full, run_dir)
                 zf.write(full, arcname)

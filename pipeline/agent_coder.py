@@ -2,7 +2,7 @@ import json
 import os
 import re
 from jinja2 import Environment, FileSystemLoader
-from utils.llm_client import call_llm
+from utils.llm_client import call_llm, get_model
 from utils.file_writer import write_artifact
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -135,7 +135,7 @@ def run(
         "README пиши на русском языке."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt)
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("coder"))
     files = _parse_files(response)
 
     # Определяем ожидаемые файлы из плана (если он есть), иначе — что вернула модель
@@ -155,6 +155,7 @@ def run(
                 code=_files_to_text(src_files),
                 file_markers=_build_file_markers(src_paths),
             ),
+            model=get_model("self_check"),
         )
         fixed_files = _parse_files(fixed_response)
         # Применяем только если вернулось не меньше файлов чем было
@@ -182,3 +183,105 @@ def run(
         "src_files": written,
         "readme": "README.md",
     }
+
+
+def fix(functional_req: str, test_output: str, run_id: str) -> None:
+    """Read current src files, ask LLM to fix them based on failed test output, write back."""
+    print("[AgentCoder:fix] reading current src files...")
+
+    src_dir = os.path.join("output", run_id, "src")
+    current_files: dict[str, str] = {}
+    for dirpath, _, filenames in os.walk(src_dir):
+        for fname in sorted(filenames):
+            full = os.path.join(dirpath, fname)
+            rel = os.path.relpath(full, src_dir)
+            try:
+                with open(full, encoding="utf-8") as f:
+                    current_files[rel] = f.read()
+            except Exception:
+                pass
+
+    if not current_files:
+        print("[AgentCoder:fix] WARNING: no src files found, skipping fix")
+        return
+
+    src_paths = sorted(current_files.keys())
+    src_text = _files_to_text(current_files)
+
+    template = _jinja_env.get_template("fixer.j2")
+    user_prompt = template.render(
+        functional_req=functional_req,
+        test_output=test_output,
+        src_code=src_text,
+        file_markers=_build_file_markers(src_paths),
+    )
+
+    system_prompt = (
+        "Ты опытный senior разработчик. "
+        "Исправляй только то что нужно для прохождения тестов. "
+        "Строго соблюдай маркеры ---FILE: path---. "
+        "Выводи ВСЕ файлы, даже неизменённые."
+    )
+
+    try:
+        response = call_llm(system=system_prompt, user=user_prompt, model=get_model("fixer"))
+        fixed = _parse_files(response)
+        written = []
+        for rel_path, content in fixed.items():
+            if rel_path == "README.md":
+                continue
+            write_artifact(run_id, f"src/{rel_path}", content)
+            written.append(rel_path)
+        print(f"[AgentCoder:fix] fixed and wrote: {written}")
+    except Exception as e:
+        print(f"[AgentCoder:fix] WARNING: fix call failed ({e}), keeping original")
+
+
+def patch(instruction: str, run_id: str) -> list[str]:
+    """Apply a targeted instruction (e.g. 'change background color') to existing src files."""
+    print(f"[AgentCoder:patch] instruction: {instruction!r}")
+
+    src_dir = os.path.join("output", run_id, "src")
+    current_files: dict[str, str] = {}
+    for dirpath, _, filenames in os.walk(src_dir):
+        for fname in sorted(filenames):
+            full = os.path.join(dirpath, fname)
+            rel = os.path.relpath(full, src_dir)
+            try:
+                with open(full, encoding="utf-8") as f:
+                    current_files[rel] = f.read()
+            except Exception:
+                pass
+
+    if not current_files:
+        print("[AgentCoder:patch] WARNING: no src files found, skipping patch")
+        return []
+
+    src_paths = sorted(current_files.keys())
+
+    template = _jinja_env.get_template("patcher.j2")
+    user_prompt = template.render(
+        instruction=instruction,
+        src_code=_files_to_text(current_files),
+        file_markers=_build_file_markers(src_paths),
+    )
+
+    system_prompt = (
+        "Ты опытный senior frontend-разработчик. "
+        "Вноси только минимально необходимые изменения по инструкции. "
+        "Строго соблюдай маркеры ---FILE: path---. "
+        "Выводи ТОЛЬКО изменённые файлы."
+    )
+
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("patcher"))
+    patched = _parse_files(response)
+
+    written = []
+    for rel_path, content in patched.items():
+        if rel_path == "README.md":
+            continue
+        write_artifact(run_id, f"src/{rel_path}", content)
+        written.append(rel_path)
+
+    print(f"[AgentCoder:patch] patched files: {written}")
+    return written
