@@ -11,11 +11,16 @@ The server must be running:
 import time
 import json
 import urllib.request
-import urllib.error
 
 BASE_URL = "http://localhost:8000"
-POLL_INTERVAL = 5   # seconds between status checks
-TIMEOUT = 90        # total seconds to wait
+POLL_INTERVAL = 5    # seconds between status checks
+TIMEOUT = 180        # total seconds to wait
+
+REQUIRED_FILES = {
+    "src/index.html",
+    "tests/test_functional.py",
+    "docs/functional-req.md",
+}
 
 
 def read_file(path: str) -> str:
@@ -58,18 +63,21 @@ def main():
         time.sleep(POLL_INTERVAL)
         elapsed += POLL_INTERVAL
         status_data = get_json(f"{BASE_URL}/status/{run_id}")
-        files = status_data.get("files", [])
-        print(f"[{elapsed:3d}s] status={status_data['status']}  files={files}")
-        if status_data["status"] == "done":
+        files = set(status_data.get("files", []))
+        missing = REQUIRED_FILES - files
+        print(f"[{elapsed:3d}s] files={len(files)}  missing={sorted(missing) if missing else 'none'}")
+        if not missing:
+            print("All required files present — pipeline complete.")
             break
+    else:
+        missing = REQUIRED_FILES - files
+        print(f"\nTIMEOUT after {TIMEOUT}s. Still missing: {sorted(missing)}")
 
     print("\n--- Generated artifacts ---")
     for f in sorted(files):
         print(f"  {f}")
 
-    if not files:
-        print("WARNING: no files generated within timeout")
-    else:
+    if files:
         print(f"\nDownload zip: {BASE_URL}/download/{run_id}")
 
 

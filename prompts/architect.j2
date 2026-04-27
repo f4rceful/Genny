@@ -1,1 +1,75 @@
-{# Заглушка — Агент-архитектор (Этап 2+) #}
+Ты опытный software architect. Отвечай строго на русском языке.
+
+Тебе даны функциональные требования, нефункциональные требования и характеристики проекта.
+Твоя задача — спроектировать архитектуру веб-приложения и вернуть JSON-план.
+
+## Функциональные требования (ФТ)
+{{ functional_req }}
+
+## Нефункциональные требования (НФТ)
+{{ non_functional_req }}
+
+{% if features %}
+## Характеристики (Features)
+{{ features }}
+{% endif %}
+
+---
+
+## Задача
+
+Верни ТОЛЬКО валидный JSON-объект — без пояснений, без markdown-блоков, без текста вокруг.
+
+Структура JSON:
+
+```
+{
+  "app_name": "Название приложения",
+  "description": "Краткое описание что делает приложение",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "entry_point",
+      "description": "HTML-разметка, подключает CSS и JS"
+    },
+    {
+      "path": "css/style.css",
+      "role": "presentation",
+      "description": "Все стили, CSS-переменные для цветов и размеров"
+    },
+    {
+      "path": "js/calculator.js",
+      "role": "business_logic",
+      "description": "Класс Calculator — только логика, без DOM",
+      "classes": [
+        {
+          "name": "Calculator",
+          "properties": ["currentInput", "operator", "firstOperand", "waitingForSecond", "history"],
+          "methods": ["inputDigit", "inputOperator", "calculate", "clear", "backspace", "inputDecimal", "getHistory"]
+        }
+      ]
+    },
+    {
+      "path": "js/app.js",
+      "role": "controller",
+      "description": "Инициализация, обработчики событий, обновление DOM",
+      "dependencies": ["js/calculator.js"]
+    }
+  ],
+  "data_flow": [
+    "Пользователь нажимает кнопку → app.js читает data-атрибут → вызывает метод Calculator → обновляет DOM"
+  ],
+  "state": {
+    "storage": "localStorage",
+    "fields": ["history"]
+  },
+  "constraints": [
+    "Нет серверной части — только статические файлы",
+    "Нет внешних CDN и фреймворков"
+  ]
+}
+```
+
+Адаптируй план под конкретные требования из ФТ и Features.
+Если приложение не является калькулятором — измени файлы, классы и методы соответственно.
+Верни ТОЛЬКО JSON, ничего больше.
