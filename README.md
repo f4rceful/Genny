@@ -30,7 +30,7 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Создайте `.env` в корне (минимальная конфигурация):
+Создайте `.env` в корне:
 
 ```env
 OPENROUTER_API_KEY=
@@ -58,7 +58,6 @@ POLL_INTERVAL=5
 
 ```
 
-Полный список переменных — см. `.env` (модели для каждого агента, параметры запуска).
 
 ---
 
