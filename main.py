@@ -119,6 +119,34 @@ async def patch(run_id: str, request: PatchRequest):
     return PatchResponse(run_id=run_id, status="done", patched_files=patched_files + patched_docs)
 
 
+@app.get("/runs")
+async def list_runs():
+    runs = []
+    if not os.path.isdir("output"):
+        return {"runs": []}
+    for name in sorted(os.listdir("output"), reverse=True):
+        run_dir = os.path.join("output", name)
+        if not os.path.isdir(run_dir):
+            continue
+        info = state.read(name)
+        if info.get("status") == "running":
+            continue
+        created_at = os.path.getmtime(run_dir)
+        steps = info.get("steps", [])
+        file_count = sum(
+            1 for dirpath, _, fnames in os.walk(run_dir)
+            for f in fnames if not f.startswith(".")
+        )
+        runs.append({
+            "run_id": name,
+            "status": info.get("status", "unknown"),
+            "created_at": created_at,
+            "file_count": file_count,
+            "step_count": len(steps),
+        })
+    return {"runs": runs}
+
+
 @app.get("/status/{run_id}")
 async def status(run_id: str):
     run_dir = os.path.join("output", run_id)

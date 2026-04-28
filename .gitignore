@@ -3,6 +3,8 @@ output/
 __pycache__/
 *.pyc
 other/
+.env
+test_input_mealflow/
 
 # Frontend
 frontend/node_modules/
