@@ -24,7 +24,7 @@
 ### 1. Клонировать репозиторий
 
 ```bash
-git clone <repo>
+git clone https://github.com/f4rceful/Genny.git
 cd Genny
 ```
 
