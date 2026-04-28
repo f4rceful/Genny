@@ -21,49 +21,82 @@
 
 **Требования:** Python 3.11+, Node.js 18+, API-ключ [OpenRouter](https://openrouter.ai/keys)
 
+### 1. Клонировать репозиторий
+
 ```bash
 git clone <repo>
 cd Genny
+```
 
+### 2. Создать и активировать виртуальное окружение
+
+#### Windows (cmd)
+
+```cmd
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+.venv\Scripts\activate.bat
+```
+
+#### Windows (PowerShell)
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+> Если PowerShell блокирует скрипт, выполните один раз:
+> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+
+#### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Установить зависимости
+
+```bash
 pip install -r requirements.txt
 ```
 
-Создайте `.env` в корне:
+### 4. Создать файл `.env` в корне проекта
 
 ```env
-OPENROUTER_API_KEY=
+OPENROUTER_API_KEY=sk-or-v1-...   # ключ с openrouter.ai/keys
 
-# Модель по умолчанию (если не задана модель агента)
 MODEL_DEFAULT=google/gemini-3-flash-preview
-# Резервная модель на случай ошибки основной
 MODEL_FALLBACK=deepseek/deepseek-v4-flash
 
-# Модели для каждого агента
-MODEL_USE_CASES=deepseek/deepseek-v4-flash
+MODEL_USE_CASES=deepseek/deepseek-v3.2
 MODEL_ANALYST=deepseek/deepseek-v4-flash
 MODEL_ARCHITECT=deepseek/deepseek-v4-flash
 MODEL_CODER=google/gemini-3-flash-preview
-MODEL_TESTER=google/gemini-3-flash-preview
+MODEL_TESTER=deepseek/deepseek-v3.2
 MODEL_FIXER=google/gemini-3-flash-preview
 MODEL_PATCHER=google/gemini-3-flash-preview
 
-# Максимум попыток автоисправления кода (тесты упали → fix → retry)
 MAX_FIX_ATTEMPTS=3
 
-# Настройки тестового скрипта (test_run.py)
+# Настройки тестового скрипта
 GENERATOR_BASE_URL=http://localhost:8000
 POLL_INTERVAL=5
-
 ```
-
 
 ---
 
 ## Запуск
 
 ### Бэкенд
+
+#### Запуск на Windows
+
+```cmd
+.venv\Scripts\activate.bat
+uvicorn main:app --reload
+```
+
+#### Запуск на macOS / Linux
 
 ```bash
 source .venv/bin/activate
@@ -91,14 +124,18 @@ npm run dev
 1. Откройте `http://localhost:3000`
 2. Вставьте или загрузите файлы БТ, БП и Features (опционально)
 3. Нажмите «Начать разработку»
-4. Следите за прогрессом в логе, просматривайте файлы и preview во вкладках справа
+4. Следите за прогрессом в логе — у каждого этапа видна модель и время выполнения
+5. Завершённые проекты доступны через выпадающий список; текущий `run_id` сохраняется в URL — перезагрузка страницы восстанавливает состояние
+6. После генерации доступны: просмотр файлов, live-превью, режим доработки (Patch) и повторный запуск fix-loop (Refine)
 
 ### Через тестовый скрипт
 
 ```bash
-python test_run.py                  # Задание A (по умолчанию)
-python test_run.py test_input_b     # Задание B
-python test_run.py test_input_c     # Задание C
+python test_run.py                        # Задание A (по умолчанию)
+python test_run.py test_input_b           # Задание B
+python test_run.py test_input_c           # Задание C
+python test_run.py test_input_taskflow    # Задание D — TaskFlow
+python test_run.py test_input_mealflow    # Задание E — MealFlow
 ```
 
 Скрипт отправляет запрос, опрашивает статус и выводит список файлов. Останавливается автоматически при завершении пайплайна или по Ctrl+C.
@@ -118,7 +155,9 @@ curl -X POST http://localhost:8000/generate \
 | Метод | Эндпоинт | Описание |
 | ----- | -------- | -------- |
 | POST | `/generate` | Запустить пайплайн, вернёт `run_id` |
-| GET | `/status/{run_id}` | Статус, текущий шаг, список файлов |
+| POST | `/cancel/{run_id}` | Отменить текущую генерацию |
+| GET | `/runs` | Список завершённых проектов с метаданными |
+| GET | `/status/{run_id}` | Статус, текущий шаг, история этапов, список файлов |
 | GET | `/file/{run_id}/{path}` | Содержимое конкретного файла |
 | POST | `/patch/{run_id}` | Режим доработки — точечные правки по инструкции |
 | POST | `/refine/{run_id}` | Повторный запуск fix loop |
@@ -165,6 +204,8 @@ output/<run_id>/
 | `test_input/` | **A — Веб-калькулятор** | Простое |
 | `test_input_b/` | **B — Таск-трекер** | Среднее |
 | `test_input_c/` | **C — Конвертер валют с API** | Сложное |
+| `test_input_taskflow/` | **D — TaskFlow: Kanban-трекер** | Сложное |
+| `test_input_mealflow/` | **E — MealFlow: Планировщик питания** | Очень сложное |
 
 Для своего задания создайте папку с тремя файлами:
 
