@@ -7,7 +7,8 @@ other/
 # Frontend
 frontend/node_modules/
 frontend/.next/
-frontend/.env*.local
+frontend/.env
+.env.local*.local
 frontend/out/
 frontend/.turbo/
 frontend/coverage/
