@@ -1,6 +1,13 @@
-.env
 output/
 .venv/
 __pycache__/
 *.pyc
 other
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env*.local
+frontend/out/
+frontend/.turbo/
+frontend/coverage/

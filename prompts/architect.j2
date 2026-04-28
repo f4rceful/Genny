@@ -20,17 +20,17 @@
 
 Верни ТОЛЬКО валидный JSON-объект — без пояснений, без markdown-блоков, без текста вокруг.
 
-Структура JSON:
+Структура JSON (адаптируй содержимое под конкретные ФТ — не копируй имена из примера):
 
 ```
 {
-  "app_name": "Название приложения",
+  "app_name": "Название из Features или ФТ",
   "description": "Краткое описание что делает приложение",
   "files": [
     {
       "path": "index.html",
       "role": "entry_point",
-      "description": "HTML-разметка, подключает CSS и JS"
+      "description": "HTML-разметка, подключает CSS и JS без inline-кода"
     },
     {
       "path": "css/style.css",
@@ -38,14 +38,14 @@
       "description": "Все стили, CSS-переменные для цветов и размеров"
     },
     {
-      "path": "js/calculator.js",
+      "path": "js/<имя-из-предметной-области>.js",
       "role": "business_logic",
-      "description": "Класс Calculator — только логика, без DOM",
+      "description": "Классы/функции только с бизнес-логикой — без DOM",
       "classes": [
         {
-          "name": "Calculator",
-          "properties": ["currentInput", "operator", "firstOperand", "waitingForSecond", "history"],
-          "methods": ["inputDigit", "inputOperator", "calculate", "clear", "backspace", "inputDecimal", "getHistory"]
+          "name": "<ИмяКласса из предметной области>",
+          "properties": ["<свойство1>", "<свойство2>"],
+          "methods": ["<метод1>", "<метод2>"]
         }
       ]
     },
@@ -53,15 +53,15 @@
       "path": "js/app.js",
       "role": "controller",
       "description": "Инициализация, обработчики событий, обновление DOM",
-      "dependencies": ["js/calculator.js"]
+      "dependencies": ["js/<имя-из-предметной-области>.js"]
     }
   ],
   "data_flow": [
-    "Пользователь нажимает кнопку → app.js читает data-атрибут → вызывает метод Calculator → обновляет DOM"
+    "Пользователь → событие в app.js → вызов метода бизнес-класса → обновление DOM"
   ],
   "state": {
-    "storage": "localStorage",
-    "fields": ["history"]
+    "storage": "localStorage или memory",
+    "fields": ["<поле1>", "<поле2>"]
   },
   "constraints": [
     "Нет серверной части — только статические файлы",
@@ -70,6 +70,11 @@
 }
 ```
 
-Адаптируй план под конкретные требования из ФТ и Features.
-Если приложение не является калькулятором — измени файлы, классы и методы соответственно.
-Верни ТОЛЬКО JSON, ничего больше.
+## Правила
+
+- **Имена файлов, классов и методов** выводи из предметной области ФТ, не из примера выше.
+  Пример: для таск-трекера — `TaskBoard`, `Task`, `addTask`, `moveTask`. Для конвертера — `CurrencyConverter`, `fetchRates`, `convert`.
+- Если приложение использует внешний API — добавь отдельный файл для работы с API (например `js/api.js`) со своей ролью `api_client`.
+- Если в ФТ несколько независимых доменных сущностей — создай отдельный JS-файл для каждой.
+- Количество файлов должно соответствовать сложности приложения: не дели простое на 5 файлов и не пиши сложное в один.
+- Верни ТОЛЬКО JSON, ничего больше.

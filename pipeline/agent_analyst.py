@@ -8,11 +8,11 @@ _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
 _jinja_env = Environment(loader=FileSystemLoader(_PROMPTS_DIR))
 
 
-def run(bt: str, bp: str, features: str, run_id: str) -> dict:
+def run(bt: str, bp: str, features: str, run_id: str, use_cases: str = "") -> dict:
     print("[AgentAnalyst] starting...")
 
     template = _jinja_env.get_template("analyst.j2")
-    user_prompt = template.render(bt=bt, bp=bp, features=features)
+    user_prompt = template.render(bt=bt, bp=bp, features=features, use_cases=use_cases)
 
     system_prompt = (
         "Ты опытный бизнес-аналитик программного обеспечения. "

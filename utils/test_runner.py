@@ -10,10 +10,11 @@ def run_tests(run_id: str) -> dict:
         return {"passed": False, "output": "tests/ directory not found", "returncode": -1}
 
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", tests_dir, "-v", "--tb=short", "--no-header", "-q"],
+        [sys.executable, "-m", "pytest", tests_dir, "-v", "--tb=short", "--no-header", "-q",
+         "--timeout=10"],
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=120,
     )
 
     output = result.stdout + result.stderr

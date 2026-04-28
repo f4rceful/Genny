@@ -5,3 +5,6 @@ jinja2
 python-multipart
 pydantic
 python-dotenv
+pytest
+pytest-timeout
+aiofiles
