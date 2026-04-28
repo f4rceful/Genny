@@ -1,23 +1,26 @@
+"""Оркестратор пайплайна: запускает агентов по цепочке и управляет циклом автоисправления тестов."""
 import os
 
 from pipeline import agent_use_cases, agent_analyst, agent_architect, agent_coder, agent_tester
 from utils import state, cancel as cancel_utils
+from utils.cancel import CancelledError
 from utils.llm_client import get_model
 from utils.test_runner import run_tests
 
 MAX_FIX_ATTEMPTS = int(os.environ.get("MAX_FIX_ATTEMPTS", 3))
 
 
-class CancelledError(Exception):
-    pass
-
-
 def _check_cancel(run_id: str) -> None:
+    """Проверяет флаг отмены между шагами пайплайна и бросает CancelledError если он установлен."""
     if cancel_utils.is_cancelled(run_id):
         raise CancelledError("Отменено пользователем")
 
 
 def run_pipeline(bt: str, bp: str, features: str, run_id: str) -> list[str]:
+    """Запускает полный пайплайн генерации: юз-кейсы → аналитик → архитектор → кодер → тестер → цикл исправлений.
+
+    Возвращает список путей всех сгенерированных артефактов.
+    """
     print(f"[Runner] starting pipeline for run_id={run_id}")
     state.write(run_id, "running", step="initializing")
 
@@ -59,6 +62,7 @@ def run_pipeline(bt: str, bp: str, features: str, run_id: str) -> list[str]:
             run_id=run_id,
         )
 
+        # Цикл автоисправления: запускаем тесты → если падают → исправляем код → повторяем
         for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
             _check_cancel(run_id)
             state.write(run_id, "running", step=f"test-check (попытка {attempt}/{MAX_FIX_ATTEMPTS})")
@@ -83,6 +87,7 @@ def run_pipeline(bt: str, bp: str, features: str, run_id: str) -> list[str]:
                 run_id=run_id,
             )
 
+            # После исправления кода перегенерируем тесты — они тоже могут содержать ошибки
             _check_cancel(run_id)
             state.write(run_id, "running", step=f"re-testing (попытка {attempt}/{MAX_FIX_ATTEMPTS})", model=get_model("tester"))
             agent_tester.run(
@@ -105,7 +110,7 @@ def run_pipeline(bt: str, bp: str, features: str, run_id: str) -> list[str]:
         return artifacts
 
     except CancelledError:
-        state.write(run_id, "failed", step="", error="Генерация отменена пользователем")
+        state.write(run_id, "cancelled", step="", error="Генерация отменена пользователем")
         print(f"[Runner] pipeline CANCELLED for run_id={run_id}")
         raise
 
@@ -117,11 +122,12 @@ def run_pipeline(bt: str, bp: str, features: str, run_id: str) -> list[str]:
         raise
 
     finally:
+        # Очищаем событие отмены в любом случае — успех, ошибка или отмена
         cancel_utils.cleanup(run_id)
 
 
 def refine_pipeline(run_id: str) -> None:
-    """Re-run fix loop on an existing run: test → fix → retest (up to MAX_FIX_ATTEMPTS)."""
+    """Перезапускает цикл тестирования и исправления для уже сгенерированного проекта."""
     print(f"[Runner] starting refine for run_id={run_id}")
 
     fr_path = os.path.join("output", run_id, "docs", "functional-req.md")
@@ -135,6 +141,7 @@ def refine_pipeline(run_id: str) -> None:
 
     try:
         for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
+            _check_cancel(run_id)
             state.write(run_id, "running", step=f"refine: тест (попытка {attempt}/{MAX_FIX_ATTEMPTS})")
             print(f"[Runner:refine] running tests (attempt {attempt}/{MAX_FIX_ATTEMPTS})...")
             result = run_tests(run_id)
@@ -149,6 +156,7 @@ def refine_pipeline(run_id: str) -> None:
                 print("[Runner:refine] max fix attempts reached")
                 break
 
+            _check_cancel(run_id)
             state.write(run_id, "running", step=f"refine: исправление (попытка {attempt}/{MAX_FIX_ATTEMPTS})", model=get_model("fixer"))
             agent_coder.fix(
                 functional_req=functional_req,
@@ -156,11 +164,17 @@ def refine_pipeline(run_id: str) -> None:
                 run_id=run_id,
             )
 
+            _check_cancel(run_id)
             state.write(run_id, "running", step=f"refine: тесты (попытка {attempt}/{MAX_FIX_ATTEMPTS})", model=get_model("tester"))
             agent_tester.run(functional_req=functional_req, run_id=run_id)
 
         state.write(run_id, "done", step="")
         print(f"[Runner:refine] done for run_id={run_id}")
+
+    except CancelledError:
+        state.write(run_id, "cancelled", step="", error="Генерация отменена пользователем")
+        print(f"[Runner:refine] CANCELLED for run_id={run_id}")
+        raise
 
     except Exception as e:
         error_msg = f"{type(e).__name__}: {e}"
@@ -168,3 +182,6 @@ def refine_pipeline(run_id: str) -> None:
         state.write(run_id, "failed", step=current.get("step", ""), error=error_msg)
         print(f"[Runner:refine] FAILED: {error_msg}")
         raise
+
+    finally:
+        cancel_utils.cleanup(run_id)

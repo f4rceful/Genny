@@ -1,13 +1,17 @@
+"""LLM-клиент: отправка запросов через OpenRouter с поддержкой фолбэка и отмены генерации."""
 import os
+import time
+import concurrent.futures
 import openai
 from dotenv import load_dotenv
+from utils.cancel import is_cancelled, CancelledError
 
 load_dotenv()
 
-DEFAULT_MODEL = "qwen/qwen3-235b-a22b"
-FALLBACK_MODEL = "qwen/qwen3-30b-a3b"
+DEFAULT_MODEL = "google/gemini-3-flash-preview"
+FALLBACK_MODEL = "deepseek/deepseek-v4-flash"
 
-# Имена агентов → переменная окружения
+# Маппинг агентов → переменная окружения для независимой настройки модели каждого агента
 _AGENT_ENV: dict[str, str] = {
     "use_cases":  "MODEL_USE_CASES",
     "analyst":    "MODEL_ANALYST",
@@ -21,9 +25,7 @@ _AGENT_ENV: dict[str, str] = {
 
 
 def get_model(agent: str) -> str:
-    """Return model for the given agent, reading from env vars with fallback chain:
-    MODEL_<AGENT> → MODEL_DEFAULT → hardcoded DEFAULT_MODEL
-    """
+    """Возвращает модель для агента: env-переменная агента → MODEL_DEFAULT → хардкод."""
     env_key = _AGENT_ENV.get(agent, f"MODEL_{agent.upper()}")
     model = os.environ.get(env_key, "").strip()
     if not model:
@@ -34,13 +36,26 @@ def get_model(agent: str) -> str:
 
 
 def _strip_thinking(text: str) -> str:
+    """Удаляет блок <think>...</think> из ответов моделей с цепочкой рассуждений (CoT)."""
     idx = text.find("</think>")
     if idx != -1:
         return text[idx + len("</think>"):].lstrip("\n")
     return text
 
 
-def call_llm(system: str, user: str, model: str = "") -> str:
+def _run_with_cancel(fn, run_id: str):
+    """Запускает fn в отдельном потоке и прерывает его при отмене запуска."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn)
+        while not future.done():
+            if is_cancelled(run_id):
+                raise CancelledError("Отменено пользователем")
+            time.sleep(0.5)
+        return future.result()
+
+
+def call_llm(system: str, user: str, model: str = "", run_id: str = "") -> str:
+    """Отправляет запрос к LLM; при сбое основной модели переключается на фолбэк."""
     if not model:
         model = get_model("default")
 
@@ -54,8 +69,9 @@ def call_llm(system: str, user: str, model: str = "") -> str:
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
         default_headers={
-            "HTTP-Referer": "https://github.com/generator-hackathon",
-            "X-Title": "generator-hackathon",
+            # Опциональные заголовки для идентификации в дашборде OpenRouter
+            "HTTP-Referer": "https://github.com/f4rceful/Genny",
+            "X-Title": "Genny",
         },
     )
 
@@ -69,12 +85,21 @@ def call_llm(system: str, user: str, model: str = "") -> str:
         )
         return response.choices[0].message.content or ""
 
+    def _call(m: str) -> str:
+        if run_id:
+            return _run_with_cancel(lambda: _request(m), run_id)
+        return _request(m)
+
     try:
-        raw = _request(model)
+        raw = _call(model)
+    except CancelledError:
+        raise
     except Exception as e:
         print(f"[llm_client] Primary model {model!r} failed: {e}. Falling back to {fallback!r}")
         try:
-            raw = _request(fallback)
+            raw = _call(fallback)
+        except CancelledError:
+            raise
         except Exception as e2:
             raise RuntimeError(f"Both models failed. Last error: {e2}") from e2
 

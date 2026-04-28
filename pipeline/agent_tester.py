@@ -1,3 +1,4 @@
+"""Агент-тестировщик: генерирует pytest-тесты на основе ФТ и исходного кода приложения."""
 import os
 import re
 from jinja2 import Environment, FileSystemLoader
@@ -9,7 +10,7 @@ _jinja_env = Environment(loader=FileSystemLoader(_PROMPTS_DIR))
 
 
 def _read_all_src(run_id: str) -> str:
-    """Read all source files from output/{run_id}/src/ and concatenate them with headers."""
+    """Читает все файлы из output/{run_id}/src/ и объединяет в один текст для передачи модели."""
     src_dir = os.path.join("output", run_id, "src")
     if not os.path.isdir(src_dir):
         return ""
@@ -29,6 +30,7 @@ def _read_all_src(run_id: str) -> str:
 
 
 def run(functional_req: str, run_id: str, src_code: str = "") -> dict:
+    """Генерирует tests/test_functional.py на основе ФТ и исходного кода приложения."""
     print("[AgentTester] starting...")
 
     if not src_code:
@@ -46,11 +48,13 @@ def run(functional_req: str, run_id: str, src_code: str = "") -> dict:
         "Комментарии и docstring — на русском языке."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("tester"))
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("tester"), run_id=run_id)
 
+    # Модель может добавить блок ---REQUIREMENTS--- после тестов — он нам не нужен
     parts = response.split("---REQUIREMENTS---", maxsplit=1)
     test_code = parts[0].strip()
 
+    # Убираем markdown-обёртку если модель вернула ```python ... ```
     test_code = re.sub(r"^```(?:python)?\s*\n?", "", test_code, flags=re.IGNORECASE)
     test_code = re.sub(r"\n?```\s*$", "", test_code)
     test_code = test_code.strip()

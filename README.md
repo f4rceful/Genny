@@ -1,130 +1,58 @@
 # Genny
 
-Генератор веб-приложений на основе LLM-агентов. Принимает бизнес-требования и бизнес-процесс в формате Markdown — выдаёт готовое веб-приложение с полным комплектом документации.
-
-## Как это работает
+Генератор веб-приложений на основе LLM-агентов. Подаёте бизнес-требования и бизнес-процесс в формате Markdown — получаете готовое веб-приложение с полным комплектом документации (юз-кейсы, НФТ, ФТ, код, тесты).
 
 ```
-┌──────────────────────────────────────────────────────┐
-│        БТ  +  БП  +  Features (опционально)          │
-└──────────────────────────┬───────────────────────────┘
-                           │
-            ┌──────────────▼──────────────┐
-            │     Агент 1: Use-cases      │──▶  docs/use-cases.md
-            └──────────────┬──────────────┘
-                           │
-            ┌──────────────▼──────────────┐  docs/non-functional-req.md
-            │     Агент 2: Аналитик       │──▶
-            └──────────────┬──────────────┘  docs/functional-req.md
-                           │
-            ┌──────────────▼──────────────┐
-            │    Агент 3: Архитектор      │──▶  docs/architecture.json
-            └──────────────┬──────────────┘
-                           │
-            ┌──────────────▼──────────────┐
-            │  Агент 4: Кодогенератор     │──▶  src/  +  README.md
-            └──────────────┬──────────────┘
-                           │
-            ┌──────────────▼──────────────┐
-            │   Агент 5: Тестировщик      │──▶  tests/test_functional.py
-            └──────────────┬──────────────┘
-                           │
-            ┌──────────────▼──────────────┐
-            │    Цикл самопроверки  ↺     │──▶  fix loop (до 3 попыток)
-            └─────────────────────────────┘
+БТ + БП + Features (опционально)
+  └─► Юз-кейсы
+      └─► НФТ + ФТ
+          └─► Архитектурный план
+              └─► Исходный код (HTML/CSS/JS)
+                  └─► Тесты (pytest)
+                      └─► Цикл автоисправления ↺
 ```
 
 ---
 
-## Установка
+## Быстрый старт
 
-**Требования:** Python 3.11+, Node.js 18+, API-ключ [OpenRouter](https://openrouter.ai/keys)
+> **Требования:** Python 3.11+, Node.js 18+, API-ключ [OpenRouter](https://openrouter.ai/keys)
 
-### 1. Клонировать репозиторий
+### 1. Клонировать и установить зависимости
 
 ```bash
 git clone https://github.com/f4rceful/Genny.git
 cd Genny
-```
-
-### 2. Создать и активировать виртуальное окружение
-
-#### Windows (cmd)
-
-```cmd
 python -m venv .venv
-.venv\Scripts\activate.bat
-```
-
-#### Windows (PowerShell)
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-> Если PowerShell блокирует скрипт, выполните один раз:
-> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-
-#### macOS / Linux
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Установить зависимости
-
-```bash
+source .venv/bin/activate        # Windows: .venv\Scripts\activate.bat
 pip install -r requirements.txt
 ```
 
-### 4. Создать файл `.env` в корне проекта
+### 2. Создать файл `.env`
 
-```env
-OPENROUTER_API_KEY=sk-or-v1-...   # ключ с openrouter.ai/keys
-
-MODEL_DEFAULT=google/gemini-3-flash-preview
-MODEL_FALLBACK=deepseek/deepseek-v4-flash
-
-MODEL_USE_CASES=deepseek/deepseek-v3.2
-MODEL_ANALYST=deepseek/deepseek-v4-flash
-MODEL_ARCHITECT=deepseek/deepseek-v4-flash
-MODEL_CODER=google/gemini-3-flash-preview
-MODEL_TESTER=deepseek/deepseek-v3.2
-MODEL_FIXER=google/gemini-3-flash-preview
-MODEL_PATCHER=google/gemini-3-flash-preview
-
-MAX_FIX_ATTEMPTS=3
-
-# Настройки тестового скрипта
-GENERATOR_BASE_URL=http://localhost:8000
-POLL_INTERVAL=5
-```
-
----
-
-## Запуск
-
-### Бэкенд
-
-#### Запуск на Windows
-
-```cmd
-.venv\Scripts\activate.bat
-uvicorn main:app --reload
-```
-
-#### Запуск на macOS / Linux
+Скопируйте пример и вставьте свой ключ:
 
 ```bash
-source .venv/bin/activate
+cp .env.example .env
+```
+
+Откройте `.env` и вставьте ключ в первую строку:
+
+```env
+OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+Остальные параметры в `.env.example` уже заполнены рабочими значениями — менять не нужно.
+
+### 3. Запустить бэкенд
+
+```bash
 uvicorn main:app --reload
 ```
 
 Сервер запустится на `http://localhost:8000`.
 
-### Веб-интерфейс (опционально)
+### 4. Запустить веб-интерфейс (в отдельном терминале)
 
 ```bash
 cd frontend
@@ -132,65 +60,79 @@ npm install
 npm run dev
 ```
 
-Откройте `http://localhost:3000` — веб-интерфейс для запуска генерации, просмотра файлов и preview сгенерированного приложения.
+Откройте **<http://localhost:3000>** — интерфейс готов.
 
----
+### 5. Сгенерировать первый проект
 
-## Использование
+В браузере:
 
-### Через веб-интерфейс
+1. Вставьте или загрузите файлы БТ и БП (примеры — в папке `test_input/`)
+2. Нажмите «Начать разработку»
+3. Дождитесь завершения (~3–7 минут)
 
-1. Откройте `http://localhost:3000`
-2. Вставьте или загрузите файлы БТ, БП и Features (опционально)
-3. Нажмите «Начать разработку»
-4. Следите за прогрессом в логе — у каждого этапа видна модель и время выполнения
-5. Завершённые проекты доступны через выпадающий список; текущий `run_id` сохраняется в URL — перезагрузка страницы восстанавливает состояние
-6. После генерации доступны: просмотр файлов, live-превью, режим доработки (Patch) и повторный запуск fix-loop (Refine)
-
-### Через тестовый скрипт
+Или через скрипт (пока сервер запущен):
 
 ```bash
-python test_run.py                        # Задание A (по умолчанию)
-python test_run.py test_input_b           # Задание B
-python test_run.py test_input_c           # Задание C
-python test_run.py test_input_taskflow    # Задание D — TaskFlow
-python test_run.py test_input_mealflow    # Задание E — MealFlow
-```
-
-Скрипт отправляет запрос, опрашивает статус и выводит список файлов. Останавливается автоматически при завершении пайплайна или по Ctrl+C.
-
-### Через curl
-
-```bash
-curl -X POST http://localhost:8000/generate \
-  -H "Content-Type: application/json" \
-  -d "{\"bt\": \"$(cat test_input/bt.md)\", \"bp\": \"$(cat test_input/bp.md)\"}"
+python test_run.py              # Задание A — Веб-калькулятор
+python test_run.py test_input_b # Задание B — Таск-трекер
+python test_run.py test_input_c # Задание C — Конвертер валют
 ```
 
 ---
 
-## API
+## Настройка моделей
 
-| Метод | Эндпоинт | Описание |
-| ----- | -------- | -------- |
-| POST | `/generate` | Запустить пайплайн, вернёт `run_id` |
-| POST | `/cancel/{run_id}` | Отменить текущую генерацию |
-| GET | `/runs` | Список завершённых проектов с метаданными |
-| GET | `/status/{run_id}` | Статус, текущий шаг, история этапов, список файлов |
-| GET | `/file/{run_id}/{path}` | Содержимое конкретного файла |
-| POST | `/patch/{run_id}` | Режим доработки — точечные правки по инструкции |
-| POST | `/refine/{run_id}` | Повторный запуск fix loop |
-| GET | `/download/{run_id}` | Скачать все артефакты zip-архивом |
+Каждый агент использует свою модель. Всё задаётся в `.env`:
 
-### Режим доработки
+```env
+OPENROUTER_API_KEY=sk-or-v1-...
+# Основная модель
+MODEL_DEFAULT=google/gemini-3-flash-preview
 
-```bash
-curl -X POST http://localhost:8000/patch/<run_id> \
-  -H "Content-Type: application/json" \
-  -d '{"instruction": "добавь валидацию email"}'
+# Резервная модель (если основная упала)
+MODEL_FALLBACK=deepseek/deepseek-v4-flash
+
+# Модели по агентам
+MODEL_USE_CASES=deepseek/deepseek-v3.2 # Юз кейсы
+MODEL_ANALYST=deepseek/deepseek-v4-flash # Аналитик
+MODEL_ARCHITECT=deepseek/deepseek-v4-flash #Архитектор
+MODEL_CODER=google/gemini-3-flash-preview # Кодер(Разработчик-Программист)
+MODEL_TESTER=deepseek/deepseek-v3.2 # Тестировщик
+MODEL_FIXER=google/gemini-3-flash-preview # Фикшер(Исправляет ошибки тестов)
+MODEL_PATCHER=google/gemini-3-flash-preview # Патчер (Редактирует итоговый код)
+
+MAX_FIX_ATTEMPTS=3 # Попытки исправления тестов
 ```
 
-Обновляет и код (`src/`), и документацию (`docs/`).
+> Если хотите использовать одну модель для всего, достаточно задать только `MODEL_DEFAULT`.
+
+### Совместимые модели
+
+Генератор работает через [OpenRouter](https://openrouter.ai) — совместим с любой моделью из их каталога. Проверенные варианты:
+
+| Модель | OpenRouter ID | Подходит для |
+| ------ | ------------- | ------------ |
+| **Gemini 3.0 Flash Preview** | `google/gemini-3-flash-preview` | Кодинг, тесты, патчер — быстро и дёшево |
+| **DeepSeek V3.2** | `deepseek/deepseek-v3.2` | Аналитика, юз-кейсы, архитектура |
+| **DeepSeek V4 Flash** | `deepseek/deepseek-v4-flash` | Лучший баланс цена/качество |
+
+> Любая другая модель из каталога OpenRouter тоже подойдёт. Предпочтительнее быстрые (flash/mini) — pipeline занимает меньше времени.
+
+---
+
+## Как это работает
+
+Генератор запускает цепочку из 5 специализированных агентов:
+
+| Агент | Задача | Выходной файл |
+| ----- | ------ | ------------- |
+| Use-cases | Выделяет пользовательские сценарии из БТ+БП | `docs/use-cases.md` |
+| Аналитик | Генерирует НФТ и ФТ с привязкой к источникам | `docs/non-functional-req.md`, `docs/functional-req.md` |
+| Архитектор | Проектирует файловую структуру приложения | `docs/architecture.json` |
+| Кодогенератор | Пишет HTML/CSS/JS по архитектурному плану | `src/` + `README.md` |
+| Тестировщик | Пишет pytest-тесты по ФТ | `tests/test_functional.py` |
+
+После генерации автоматически запускаются тесты. Если что-то падает — агент-фиксер исправляет код и тесты перезапускаются (до 3 попыток).
 
 ---
 
@@ -208,11 +150,54 @@ output/<run_id>/
 │   ├── css/style.css
 │   └── js/...
 ├── tests/
-│   └── test_functional.py     # pytest, 1 тест на каждое ФТ
-└── README.md                  # Инструкция по запуску приложения
+│   └── test_functional.py
+└── README.md
 ```
 
-Сгенерированное приложение открывается без сервера: `output/<run_id>/src/index.html`.
+Сгенерированное приложение запускается напрямую: откройте `output/<run_id>/src/index.html` в браузере.
+
+---
+
+## Режим доработки
+
+После завершённой генерации можно внести точечные правки через интерфейс (раздел «Доработка») или API:
+
+```bash
+curl -X POST http://localhost:8000/patch/<run_id> \
+  -H "Content-Type: application/json" \
+  -d '{"instruction": "добавь валидацию email"}'
+```
+
+Генератор обновит и код, и документацию.
+
+---
+
+## API
+
+| Метод | Эндпоинт | Описание |
+| ----- | -------- | -------- |
+| POST | `/generate` | Запустить пайплайн, вернёт `run_id` |
+| GET | `/status/{run_id}` | Статус, шаг, список файлов |
+| POST | `/patch/{run_id}` | Точечные правки по инструкции |
+| POST | `/cancel/{run_id}` | Отменить генерацию |
+| GET | `/runs` | Список завершённых проектов |
+| GET | `/file/{run_id}/{path}` | Содержимое файла |
+| GET | `/download/{run_id}` | Скачать артефакты zip-архивом |
+
+---
+
+## Примеры сгенерированных приложений
+
+В папке `examples/` лежат три готовых проекта, сгенерированных Genny из тестовых заданий:
+
+| Папка | Приложение | Задание |
+| ----- | ---------- | ------- |
+| `examples/task-a-calculator/` | **MathBox** — веб-калькулятор с историей | A (простое) |
+| `examples/task-b-tasktracker/` | **TaskFlow** — Kanban-трекер задач | B (среднее) |
+| `examples/task-c-currency/` | **CurrencyFlow** — конвертер валют с API | C (сложное) |
+
+Каждый пример содержит полный набор артефактов: `docs/`, `src/`, `tests/`, `README.md`.
+Сгенерированное приложение запускается напрямую — откройте `src/index.html` в браузере.
 
 ---
 
@@ -220,59 +205,11 @@ output/<run_id>/
 
 | Папка | Задание | Сложность |
 | ----- | ------- | --------- |
-| `test_input/` | **A — Веб-калькулятор** | Простое |
-| `test_input_b/` | **B — Таск-трекер** | Среднее |
-| `test_input_c/` | **C — Конвертер валют с API** | Сложное |
-| `test_input_taskflow/` | **D — TaskFlow: Kanban-трекер** | Сложное |
-| `test_input_mealflow/` | **E — MealFlow: Планировщик питания** | Очень сложное |
-
-Для своего задания создайте папку с тремя файлами:
-
-| Файл | Содержимое |
-| ---- | ---------- |
-| `bt.md` | Таблица бизнес-требований с ID (БТ-01...) и признаком обязательности |
-| `bp.md` | Описание бизнес-процесса: актор, основные и альтернативные потоки |
-| `features.md` | Произвольные пожелания: тема, язык, название, ограничения (опционально) |
-
----
-
-## Рекомендуемые модели
-
-Актуально на **апрель 2026**. Разные агенты решают разные задачи — оптимальный выбор:
-
-### Топовые модели для кодинга (по бенчмаркам)
-
-| Модель | OpenRouter ID | Особенности |
-| ------ | ------------- | ----------- |
-| Claude Sonnet 4.6 | `anthropic/claude-sonnet-4-6` | Лучший баланс цена/качество для агентов и кода |
-| Claude Opus 4.7 | `anthropic/claude-opus-4-7` | #2 в coding arena (1098/1100), лучший для сложных задач |
-| DeepSeek V4 Flash | `deepseek/deepseek-v4-flash` | Быстрый, дешёвый, хороший для аналитических задач |
-| DeepSeek V3.2 | `deepseek/deepseek-v3.2` | GPT-5 класс, отличный coding, дешевле frontier |
-| Gemini 3 Flash Preview | `google/gemini-3-flash-preview` | Высокая скорость, thinking, coding и агентные задачи |
-| MiMo-V2-Flash | `xiaomi/mimo-v2-flash` | **#1 open-source на SWE-bench Verified**, быстрый |
-| MiMo-V2-Pro | `xiaomi/mimo-v2-pro` | Топ open-source, приближается к Opus 4.6 |
-| Gemini 2.5 Flash | `google/gemini-2.5-flash` | Быстрый, хорошее reasoning и coding |
-| Kimi K2.6 | `moonshot/kimi-k2.6` | Лучший open-source для кода на апрель 2026 |
-
-### По агентам
-
-| Агент | Задача | Лучший выбор | Бюджетный вариант |
-| ----- | ------ | ------------ | ----------------- |
-| `use_cases` | Юз-кейсы из БТ/БП | `deepseek/deepseek-v3.2` | `xiaomi/mimo-v2-flash` |
-| `analyst` | Структурированный текст НФТ/ФТ | `anthropic/claude-sonnet-4-6` | `deepseek/deepseek-v3.2` |
-| `architect` | JSON-план, архитектура | `anthropic/claude-opus-4-7` | `moonshot/kimi-k2.6` |
-| `coder` | Генерация HTML/CSS/JS | `anthropic/claude-sonnet-4-6` | `xiaomi/mimo-v2-pro` |
-| `self_check` | Code review, исправление структуры | `deepseek/deepseek-v3.2` | `xiaomi/mimo-v2-flash` |
-| `tester` | Написание pytest-тестов | `deepseek/deepseek-v3.2` | `google/gemini-2.5-flash` |
-| `fixer` | Исправление кода по тестам | `anthropic/claude-sonnet-4-6` | `moonshot/kimi-k2.6` |
-| `patcher` | Точечные правки по инструкции | `google/gemini-2.5-flash` | `xiaomi/mimo-v2-flash` |
-
-**Советы:**
-
-- `coder`, `architect`, `fixer` — не экономить, от них зависит качество итогового кода
-- `patcher`, `use_cases` — задачи простые, подойдут быстрые и дешёвые модели
-- Бесплатно попробовать: `tencent/hy3-preview:free` или роутер `openrouter/free` (50 запросов/день)
-- MiMo-V2-Flash — неожиданно сильный open-source вариант за малые деньги
+| `test_input/` | A — Веб-калькулятор | Простое |
+| `test_input_b/` | B — Таск-трекер | Среднее |
+| `test_input_c/` | C — Конвертер валют с API | Сложное |
+| `test_input_taskflow/` | D — TaskFlow (Kanban) | Сложное |
+| `test_input_mealflow/` | E — MealFlow (планировщик питания) | Сложное |
 
 ---
 
@@ -282,6 +219,6 @@ output/<run_id>/
 | --------- | ---------- |
 | Бэкенд генератора | Python 3.11, FastAPI |
 | Веб-интерфейс | Next.js 15, React 19, Tailwind CSS |
-| LLM-провайдер | OpenRouter |
+| LLM-провайдер | OpenRouter (любая совместимая модель) |
 | Генерируемое приложение | Vanilla HTML + CSS + JS |
 | Тесты | pytest, pytest-timeout |

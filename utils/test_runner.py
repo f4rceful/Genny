@@ -1,10 +1,11 @@
+"""Запуск pytest для сгенерированных тестов приложения."""
 import os
 import subprocess
 import sys
 
 
 def run_tests(run_id: str) -> dict:
-    """Run pytest for the given run_id. Returns dict with passed, output, returncode."""
+    """Запускает pytest в output/{run_id}/tests/ и возвращает {passed, output, returncode}."""
     tests_dir = os.path.join("output", run_id, "tests")
     if not os.path.isdir(tests_dir):
         return {"passed": False, "output": "tests/ directory not found", "returncode": -1}
@@ -14,7 +15,7 @@ def run_tests(run_id: str) -> dict:
          "--timeout=10"],
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=120,  # жёсткий лимит на случай зависания тестов
     )
 
     output = result.stdout + result.stderr

@@ -1,0 +1,234 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --accent: #bb86fc;
+    --btn-bg: #2c2c2c;
+    --btn-hover: #3d3d3d;
+    --op-color: #03dac6;
+    --equal-color: #bb86fc;
+    --error-color: #cf6679;
+    --danger-color: #b00020;
+    --transition: 0.2s ease;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.app-container {
+    display: flex;
+    gap: 20px;
+    max-width: 900px;
+    width: 100%;
+    align-items: flex-start;
+}
+
+.calculator-card {
+    background: var(--card-bg);
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    flex: 1;
+    max-width: 400px;
+}
+
+.calc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calc-header h1 {
+    font-size: 1.5rem;
+    color: var(--accent);
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.icon-btn:hover:not(:disabled) {
+    background: var(--btn-hover);
+}
+
+.icon-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.display-container {
+    background: #000;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: right;
+    margin-bottom: 20px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+}
+
+.display-secondary {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    height: 1.2rem;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.display-primary {
+    font-size: 2rem;
+    font-weight: bold;
+    word-wrap: break-word;
+    word-break: break-all;
+    max-height: 4.8rem;
+    overflow: hidden;
+}
+
+.display-primary.error {
+    color: var(--error-color);
+    font-size: 1.1rem;
+}
+
+.keypad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.btn {
+    background: var(--btn-bg);
+    border: none;
+    color: white;
+    padding: 18px;
+    font-size: 1.25rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn:hover {
+    background: var(--btn-hover);
+}
+
+.btn-op {
+    color: var(--op-color);
+}
+
+.btn-equal {
+    background: var(--equal-color);
+    color: #000;
+    grid-row: span 2;
+}
+
+.btn-equal:hover {
+    background: #d7b7fd;
+}
+
+.btn-danger {
+    color: var(--error-color);
+}
+
+.btn-func {
+    color: var(--text-secondary);
+}
+
+.btn-zero {
+    grid-column: span 2;
+}
+
+/* History Panel */
+.history-panel {
+    background: var(--card-bg);
+    width: 300px;
+    border-radius: 16px;
+    padding: 20px;
+    height: 575px;
+    display: flex;
+    flex-direction: column;
+}
+
+.history-header h2 {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--btn-bg);
+    padding-bottom: 10px;
+}
+
+.history-list {
+    list-style: none;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.history-item {
+    padding: 12px;
+    border-bottom: 1px solid var(--btn-bg);
+    font-size: 0.95rem;
+    animation: fadeIn 0.3s ease;
+    overflow: hidden;
+}
+
+.history-item .exp {
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.history-item .res {
+    color: var(--accent);
+    font-weight: bold;
+    word-break: break-all;
+}
+
+.history-empty {
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: 40px;
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    .history-panel {
+        width: 100%;
+        max-width: 400px;
+        height: 300px;
+    }
+}

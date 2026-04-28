@@ -1,0 +1,141 @@
+{
+  "app_name": "CurrencyFlow",
+  "description": "Веб-приложение для конвертации валют с кешированием курсов, историей операций и автоматическим обновлением результата.",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "entry_point",
+      "description": "Точка входа в приложение. Содержит структуру интерфейса: поля выбора валют, кнопку смены, поле суммы, блок результата, блок ошибок, историю и статус загрузки."
+    },
+    {
+      "path": "css/styles.css",
+      "role": "presentation",
+      "description": "Стили для тёмной темы (тёмный фон, светлый текст), подсветка ошибок красным, общая вёрстка компонентов."
+    },
+    {
+      "path": "js/api.js",
+      "role": "api_client",
+      "description": "Отвечает за fetch-запрос к https://open.er-api.com/v6/latest/USD. Возвращает курсы валют или выбрасывает ошибку при таймауте/сбое."
+    },
+    {
+      "path": "js/cache.js",
+      "role": "business_logic",
+      "description": "Управление кешем курсов в localStorage: сохранение, загрузка, проверка TTL (1 час).",
+      "classes": [
+        {
+          "name": "CacheManager",
+          "properties": [
+            "storageKey",
+            "ttlMs"
+          ],
+          "methods": [
+            "save(rates, timestamp)",
+            "load()",
+            "isValid()",
+            "getAge()"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "js/converter.js",
+      "role": "controller",
+      "description": "Содержит бизнес-логику конвертации: вычисление результата по паре валют и сумме. Не зависит от DOM.",
+      "classes": [
+        {
+          "name": "CurrencyConverter",
+          "properties": [
+            "rates"
+          ],
+          "methods": [
+            "setRates(rates)",
+            "convert(amount, from, to)",
+            "swap(from, to)"
+          ]
+        }
+      ],
+      "dependencies": [
+        "js/cache.js"
+      ]
+    },
+    {
+      "path": "js/history.js",
+      "role": "business_logic",
+      "description": "Управление историей конвертаций (последние 10 записей) в localStorage с санитизацией данных для XSS-безопасности.",
+      "classes": [
+        {
+          "name": "HistoryManager",
+          "properties": [
+            "storageKey",
+            "maxEntries"
+          ],
+          "methods": [
+            "addEntry(entry)",
+            "getAll()",
+            "clear()",
+            "sanitize(text)"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "js/ui.js",
+      "role": "controller",
+      "description": "Инициализация UI, подписка на события (выбор валюты, ввод суммы, клик по кнопке ⇄), обновление DOM-элементов (результата, ошибок, статуса загрузки, истории).",
+      "dependencies": [
+        "js/converter.js",
+        "js/history.js",
+        "js/cache.js",
+        "js/api.js"
+      ]
+    },
+    {
+      "path": "js/app.js",
+      "role": "controller",
+      "description": "Главный контроллер: запуск загрузки курсов при старте, обработка таймаута (5 сек), переключение на кеш при ошибке, вызов отрисовки UI.",
+      "dependencies": [
+        "js/api.js",
+        "js/cache.js",
+        "js/converter.js",
+        "js/history.js",
+        "js/ui.js"
+      ]
+    }
+  ],
+  "data_flow": [
+    "Пользователь открывает страницу → app.js запускает загрузку курсов из API (fetch с таймаутом 5 сек).",
+    "Если API отвечает успешно → данные сохраняются в localStorage через cache, курсы передаются в converter, ui обновляет статус 'Курс актуален'.",
+    "Если таймаут/ошибка → cache загружает последние сохранённые курсы; если кеш валиден (TTL <= 1ч), курсы используются, ui показывает предупреждение с датой; иначе ui блокирует конвертацию.",
+    "Пользователь вводит сумму или меняет валюту → событие в ui.js вызывает convert() из converter.js, результат отображается в DOM.",
+    "Пользователь нажимает '⇄' → вызов swap() в converter, обновление селектов, пересчёт, запись в историю.",
+    "При некорректном вводе → ui показывает сообщение об ошибке и скрывает блок результата.",
+    "После каждого успешного пересчёта создаётся запись в history.js и обновляется список истории в DOM."
+  ],
+  "state": {
+    "storage": {
+      "localStorage": [
+        "courses_cache",
+        "courses_timestamp",
+        "conversion_history"
+      ]
+    },
+    "fields": [
+      "selectedFromCurrency",
+      "selectedToCurrency",
+      "amountInput",
+      "conversionResult",
+      "errorMessage",
+      "lastUpdateTime"
+    ]
+  },
+  "constraints": [
+    "Все надписи на русском языке.",
+    "Тёмная тема по умолчанию (тёмный фон, светлый текст).",
+    "Результат обновляется автоматически без кнопки 'Конвертировать'.",
+    "История хранится в localStorage и восстанавливается между сессиями (макс. 10 записей).",
+    "Запрещена вставка неэкранированных данных в DOM (XSS-безопасность).",
+    "Некорректный ввод (пусто, ноль, отрицательное, нечисловое) блокирует конвертацию и показывает ошибку красным.",
+    "Таймаут fetch-запроса — 5 секунд; при превышении — переключение на кеш.",
+    "При недоступности API и отсутствии/устаревании кеша конвертация блокируется."
+  ]
+}

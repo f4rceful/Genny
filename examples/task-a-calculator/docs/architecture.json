@@ -1,0 +1,138 @@
+{
+  "app_name": "MathBox",
+  "description": "Простой веб-калькулятор с базовыми арифметическими операциями, историей вычислений (до 10 записей), тёмной темой и русскоязычным интерфейсом.",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "entry_point",
+      "description": "Точка входа в приложение. Содержит разметку калькулятора, боковую панель истории, подключает стили и скрипты.",
+      "dependencies": [
+        "css/styles.css",
+        "js/app.js"
+      ]
+    },
+    {
+      "path": "css/styles.css",
+      "role": "presentation",
+      "description": "Стилизация приложения: тёмная тема, расположение элементов, стили для ошибок (красная подсветка), адаптивность.",
+      "dependencies": []
+    },
+    {
+      "path": "js/app.js",
+      "role": "controller",
+      "description": "Главный модуль, инициализирующий приложение. Навешивает обработчики событий на кнопки, координирует работу calculator, history и ui.",
+      "dependencies": [
+        "js/calculator.js",
+        "js/history.js",
+        "js/ui.js"
+      ]
+    },
+    {
+      "path": "js/calculator.js",
+      "role": "business_logic",
+      "description": "Содержит функции для выполнения арифметических операций (+, -, ×, ÷), обработки деления на ноль и сброса состояния калькулятора. Не использует DOM.",
+      "classes": [
+        {
+          "name": "Calculator",
+          "properties": [
+            "firstOperand",
+            "operator",
+            "currentInput",
+            "result",
+            "errorFlag"
+          ],
+          "methods": [
+            "inputDigit(digit)",
+            "setOperator(op)",
+            "compute()",
+            "reset()",
+            "getDisplayValue()"
+          ]
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "path": "js/history.js",
+      "role": "business_logic",
+      "description": "Управление историей вычислений в localStorage. Добавление записи, получение последних 10 (с сортировкой), санитизация строк во избежание XSS.",
+      "classes": [
+        {
+          "name": "HistoryManager",
+          "properties": [],
+          "methods": [
+            "addEntry(entry)",
+            "getEntries()",
+            "sanitize(str)",
+            "saveToStorage()",
+            "loadFromStorage()"
+          ]
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "path": "js/ui.js",
+      "role": "presentation",
+      "description": "Манипуляции с DOM: обновление поля вывода, отображение/скрытие боковой панели истории, подсветка ошибок, управление кнопкой копирования результата.",
+      "classes": [
+        {
+          "name": "UIManager",
+          "properties": [],
+          "methods": [
+            "updateDisplay(value)",
+            "showError(message)",
+            "clearError()",
+            "updateHistoryPanel(entries)",
+            "copyResultToClipboard()"
+          ]
+        }
+      ],
+      "dependencies": []
+    }
+  ],
+  "data_flow": [
+    "Пользователь нажимает цифровую кнопку → app.js вызывает calculator.inputDigit() → ui.updateDisplay()",
+    "Пользователь нажимает операцию → calculator.setOperator() → ui.updateDisplay() (очищает для второго числа)",
+    "Пользователь нажимает '=' → calculator.compute() → если ошибка (деление на ноль), ui.showError(); иначе ui.updateDisplay(result) и history.addEntry() → ui.updateHistoryPanel()",
+    "Нажатие 'C' → calculator.reset() → ui.clearError() и ui.updateDisplay('')",
+    "При загрузке страницы → history.loadFromStorage() → ui.updateHistoryPanel(entries)",
+    "Нажатие кнопки копирования → ui.copyResultToClipboard()"
+  ],
+  "state": {
+    "storage": {
+      "localStorage": {
+        "fields": [
+          "history"
+        ]
+      },
+      "memory": {
+        "fields": [
+          "currentInput",
+          "firstOperand",
+          "operator",
+          "result",
+          "errorFlag"
+        ]
+      }
+    },
+    "fields": [
+      "history (localStorage, JSON массив записей вида { operand1, operator, operand2, result, timestamp })",
+      "currentInput (текущее вводимое число)",
+      "firstOperand (первый операнд)",
+      "operator (символ операции)",
+      "result (результат вычисления)",
+      "errorFlag (флаг ошибки, например 'division_by_zero')"
+    ]
+  },
+  "constraints": [
+    "История хранится только для последних 10 операций (старые записи удаляются при добавлении новой)",
+    "Все строки, сохраняемые в localStorage, проходят санитизацию (экранирование HTML-символов) для предотвращения XSS",
+    "Время отклика интерфейса на любые действия пользователя не должно превышать 100 мс",
+    "Кросс-браузерная совместимость: последние версии Chrome, Firefox, Edge, Safari (настольные и мобильные)",
+    "Интерфейс полностью на русском языке",
+    "Тёмная тема оформления (тёмный фон, светлый текст)",
+    "При делении на ноль в поле вывода отображается сообщение с красной подсветкой",
+    "Кнопка копирования результата доступна только при наличии валидного результата"
+  ]
+}

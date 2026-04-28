@@ -1,3 +1,4 @@
+"""FastAPI-бэкенд генератора: HTTP-эндпоинты для запуска пайплайна, патчинга и скачивания результатов."""
 import os
 import uuid
 import zipfile
@@ -32,10 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Статические файлы — даёт прямой доступ к сгенерированным приложениям по URL
 app.mount("/output", StaticFiles(directory="output", html=True), name="output")
 
 
 def _pipeline_task(bt: str, bp: str, features: str, run_id: str) -> None:
+    """Обёртка для запуска пайплайна в фоновом потоке FastAPI."""
     try:
         run_pipeline(bt=bt, bp=bp, features=features, run_id=run_id)
     except Exception as e:
@@ -44,6 +47,7 @@ def _pipeline_task(bt: str, bp: str, features: str, run_id: str) -> None:
 
 @app.post("/generate", response_model=GenerateResponse)
 async def generate(request: GenerateRequest, background_tasks: BackgroundTasks):
+    """Запускает пайплайн генерации в фоне и сразу возвращает run_id для дальнейшего опроса."""
     run_id = str(uuid.uuid4())
     state.write(run_id, "starting", step="queued")
     cancel_utils.register(run_id)
@@ -59,6 +63,7 @@ async def generate(request: GenerateRequest, background_tasks: BackgroundTasks):
 
 @app.post("/cancel/{run_id}")
 async def cancel_run(run_id: str):
+    """Устанавливает флаг отмены — пайплайн прервётся на следующей проверке между шагами."""
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
         raise HTTPException(status_code=404, detail="run_id not found")
@@ -74,6 +79,7 @@ async def cancel_run(run_id: str):
 
 @app.post("/refine/{run_id}", response_model=GenerateResponse)
 async def refine(run_id: str, background_tasks: BackgroundTasks):
+    """Перезапускает цикл тестирования и автоисправления для уже готового проекта."""
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
         raise HTTPException(status_code=404, detail="run_id not found")
@@ -88,6 +94,7 @@ async def refine(run_id: str, background_tasks: BackgroundTasks):
         except Exception as e:
             print(f"[main] refine task ended with error for run_id={run_id}: {e}")
 
+    cancel_utils.register(run_id)
     state.write(run_id, "running", step="refine: queued")
     background_tasks.add_task(_refine_task)
     return GenerateResponse(run_id=run_id, status="refining", artifacts=[])
@@ -95,6 +102,7 @@ async def refine(run_id: str, background_tasks: BackgroundTasks):
 
 @app.post("/patch/{run_id}", response_model=PatchResponse)
 async def patch(run_id: str, request: PatchRequest):
+    """Применяет точечные правки к коду и документации по инструкции пользователя."""
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
         raise HTTPException(status_code=404, detail="run_id not found")
@@ -121,6 +129,7 @@ async def patch(run_id: str, request: PatchRequest):
 
 @app.get("/runs")
 async def list_runs():
+    """Возвращает список завершённых запусков с метаданными (статус, кол-во файлов, шагов)."""
     runs = []
     if not os.path.isdir("output"):
         return {"runs": []}
@@ -149,6 +158,7 @@ async def list_runs():
 
 @app.get("/status/{run_id}")
 async def status(run_id: str):
+    """Возвращает текущий статус, шаг, список файлов и историю шагов для запуска."""
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
         return {"run_id": run_id, "status": "not_found", "files": [], "step": "", "error": ""}
@@ -176,11 +186,13 @@ async def status(run_id: str):
 
 @app.get("/file/{run_id}/{path:path}")
 async def get_file(run_id: str, path: str):
+    """Возвращает содержимое файла; проверяет path traversal через realpath."""
     run_dir = os.path.realpath(os.path.join("output", run_id))
     if not os.path.isdir(run_dir):
         raise HTTPException(status_code=404, detail="run_id not found")
 
     full_path = os.path.realpath(os.path.join(run_dir, path))
+    # Защита от path traversal: убеждаемся что путь находится внутри run_dir
     if not full_path.startswith(run_dir + os.sep) and full_path != run_dir:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -197,6 +209,7 @@ async def get_file(run_id: str, path: str):
 
 @app.get("/download/{run_id}")
 async def download(run_id: str):
+    """Упаковывает все артефакты запуска в zip-архив и отдаёт на скачивание."""
     run_dir = os.path.join("output", run_id)
     if not os.path.isdir(run_dir):
         raise HTTPException(status_code=404, detail="run_id not found")

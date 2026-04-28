@@ -1,0 +1,110 @@
+{
+  "app_name": "TaskFlow",
+  "description": "Одностраничное веб-приложение для управления задачами в стиле канбан-доски с возможностью фильтрации, поиска и просмотра статистики",
+  "files": [
+    {
+      "path": "index.html",
+      "role": "entry_point",
+      "description": "HTML-разметка, подключает CSS и JS без inline-кода"
+    },
+    {
+      "path": "css/style.css",
+      "role": "presentation",
+      "description": "Все стили, CSS-переменные для тёмной темы, цвета приоритетов и тегов"
+    },
+    {
+      "path": "js/dataManager.js",
+      "role": "business_logic",
+      "description": "Классы и функции для управления данными проектов и задач, сохранение в localStorage",
+      "classes": [
+        {
+          "name": "DataManager",
+          "properties": [
+            "projects",
+            "tasks",
+            "storageKey"
+          ],
+          "methods": [
+            "loadData",
+            "saveData",
+            "addProject",
+            "removeProject",
+            "addTask",
+            "removeTask",
+            "updateTask",
+            "moveTask",
+            "getProjects",
+            "getTasksByProject"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "js/taskManager.js",
+      "role": "business_logic",
+      "description": "Бизнес-логика работы с задачами: валидация, фильтрация, проверка дедлайнов",
+      "classes": [
+        {
+          "name": "TaskManager",
+          "properties": [
+            "tasks"
+          ],
+          "methods": [
+            "filterByPriority",
+            "filterByTag",
+            "filterByStatus",
+            "searchTasks",
+            "isOverdue",
+            "isToday",
+            "getTasksWithDeadlineInDays"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "js/uiRenderer.js",
+      "role": "business_logic",
+      "description": "Логика рендеринга DOM-элементов: канбан-доски, таблицы, дашборда, модальных окон",
+      "classes": [
+        {
+          "name": "UIRenderer",
+          "properties": [],
+          "methods": [
+            "renderKanban",
+            "renderListView",
+            "renderDashboard",
+            "renderModal",
+            "renderSidebar",
+            "updateCounters"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "js/app.js",
+      "role": "controller",
+      "description": "Инициализация, обработчики событий, связь между бизнес-логикой и DOM",
+      "dependencies": [
+        "js/dataManager.js",
+        "js/taskManager.js",
+        "js/uiRenderer.js"
+      ]
+    }
+  ],
+  "data_flow": [
+    "Пользователь → событие в app.js → вызов метода DataManager → обновление localStorage → вызов UIRenderer → обновление DOM"
+  ],
+  "state": {
+    "storage": "localStorage",
+    "fields": [
+      "projects",
+      "tasks"
+    ]
+  },
+  "constraints": [
+    "Нет серверной части — только статические файлы",
+    "Нет внешних CDN и фреймворков",
+    "Только HTML, CSS и нативный JavaScript",
+    "Поддержка последних версий Chromium, Firefox, Safari и Edge"
+  ]
+}

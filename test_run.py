@@ -1,15 +1,3 @@
-"""
-Quick smoke-test for the Generator pipeline.
-
-Usage:
-    python test_run.py                    # uses test_input/
-    python test_run.py test_input_b       # uses test_input_b/
-    python test_run.py test_input_c       # uses test_input_c/
-
-The server must be running:
-    uvicorn main:app --reload
-"""
-
 import os
 import sys
 import time
@@ -143,7 +131,6 @@ def main():
         final_status = "interrupted"
         print("\n\nStopped by user.")
 
-    # Summary
     print("\n" + "=" * 52)
     if final_status == "done":
         print("RESULT: OK — pipeline completed successfully")

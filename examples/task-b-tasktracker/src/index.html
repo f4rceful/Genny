@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow — Управление задачами</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>TaskFlow</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-view="dashboard">
+                    <span class="icon">📊</span> Дашборд
+                </button>
+                <div class="projects-section">
+                    <div class="section-title">
+                        <span>ПРОЕКТЫ</span>
+                        <button id="add-project-btn" title="Создать проект">+</button>
+                    </div>
+                    <div id="projects-list" class="projects-list"></div>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-box">
+                    <input type="text" id="global-search" placeholder="Поиск задач (название или описание)...">
+                </div>
+                <div class="view-controls" id="view-controls">
+                    <button class="view-btn active" data-mode="kanban">Доска</button>
+                    <button class="view-btn" data-mode="list">Список</button>
+                </div>
+            </header>
+
+            <div class="filters-bar" id="filters-bar">
+                <select id="filter-priority">
+                    <option value="all">Все приоритеты</option>
+                    <option value="high">Высокий</option>
+                    <option value="medium">Средний</option>
+                    <option value="low">Низкий</option>
+                </select>
+                <select id="filter-tag">
+                    <option value="all">Все теги</option>
+                </select>
+                <button id="reset-filters" class="reset-btn">Сбросить фильтры (<span id="filter-count">0</span>)</button>
+            </div>
+
+            <div id="content-area"></div>
+        </main>
+    </div>
+
+    <div id="project-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="project-modal-title">Новый проект</h2>
+            <form id="project-form">
+                <div class="form-group">
+                    <label for="project-name">Название проекта*</label>
+                    <input type="text" id="project-name" required maxlength="50">
+                </div>
+                <div class="form-group">
+                    <label>Цветовая метка</label>
+                    <div class="color-palette" id="color-palette">
+                        <div class="color-option active" data-color="#6366f1" style="background: #6366f1;"></div>
+                        <div class="color-option" data-color="#ec4899" style="background: #ec4899;"></div>
+                        <div class="color-option" data-color="#f59e0b" style="background: #f59e0b;"></div>
+                        <div class="color-option" data-color="#10b981" style="background: #10b981;"></div>
+                        <div class="color-option" data-color="#3b82f6" style="background: #3b82f6;"></div>
+                        <div class="color-option" data-color="#ef4444" style="background: #ef4444;"></div>
+                        <div class="color-option" data-color="#8b5cf6" style="background: #8b5cf6;"></div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary close-modal">Отмена</button>
+                    <button type="submit" class="btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="task-modal-title">Новая задача</h2>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <div class="form-group">
+                    <label for="task-title">Название задачи*</label>
+                    <input type="text" id="task-title" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="task-desc">Описание</label>
+                    <textarea id="task-desc" rows="3" maxlength="500"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-priority">Приоритет</label>
+                        <select id="task-priority">
+                            <option value="low">Низкий</option>
+                            <option value="medium" selected>Средний</option>
+                            <option value="high">Высокий</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-deadline">Дедлайн</label>
+                        <input type="date" id="task-deadline">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="task-tags">Теги (через запятую)</label>
+                    <input type="text" id="task-tags" placeholder="дизайн, фича, баг">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary close-modal">Отмена</button>
+                    <button type="submit" class="btn-primary" id="task-submit-btn">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/dataManager.js"></script>
+    <script src="js/taskManager.js"></script>
+    <script src="js/uiRenderer.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

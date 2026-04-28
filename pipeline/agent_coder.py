@@ -1,8 +1,10 @@
+"""Агент-кодогенератор: пишет HTML/CSS/JS код, проводит self-check, исправляет ошибки и патчит файлы."""
 import json
 import os
 import re
 from jinja2 import Environment, FileSystemLoader
 from utils.llm_client import call_llm, get_model
+from utils.cancel import CancelledError
 from utils.file_writer import write_artifact
 
 _PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
@@ -15,6 +17,7 @@ _SELF_CHECK_SYSTEM = (
     "Выводи ТОЛЬКО маркеры и содержимое файлов — никаких пояснений, никаких markdown-блоков."
 )
 
+# Универсальный чеклист качества кода — применяется после генерации к каждому проекту
 _SELF_CHECK_PROMPT = """\
 Проверь следующие файлы веб-приложения по универсальному чеклисту и исправь все найденные проблемы.
 
@@ -62,6 +65,7 @@ _SELF_CHECK_PROMPT = """\
 
 
 def _parse_files(response: str) -> dict[str, str]:
+    """Парсит ответ с маркерами ---FILE: path--- и ---README--- в словарь {путь: содержимое}."""
     files: dict[str, str] = {}
     pattern = r"---FILE:\s*(.+?)---\n(.*?)(?=---FILE:|---README---|$)"
     for path, content in re.findall(pattern, response, re.DOTALL):
@@ -77,6 +81,7 @@ def _parse_files(response: str) -> dict[str, str]:
 
 
 def _files_to_text(files: dict[str, str]) -> str:
+    """Сериализует словарь файлов в текст с маркерами для передачи модели."""
     parts = []
     for path, content in files.items():
         if path != "README.md":
@@ -85,7 +90,7 @@ def _files_to_text(files: dict[str, str]) -> str:
 
 
 def _build_file_markers(file_paths: list[str]) -> str:
-    """Build the expected output format string for self-check prompt."""
+    """Строит шаблон маркеров для промпта, чтобы модель знала какие файлы вернуть."""
     lines = []
     for p in file_paths:
         lines.append(f"---FILE: {p}---\n<содержимое>")
@@ -93,7 +98,7 @@ def _build_file_markers(file_paths: list[str]) -> str:
 
 
 def _expected_files_from_plan(plan: dict) -> set[str]:
-    """Extract expected file paths from the architecture plan."""
+    """Извлекает ожидаемые пути файлов из архитектурного плана для проверки полноты вывода."""
     if not plan or "files" not in plan:
         return set()
     return {f["path"] for f in plan.get("files", []) if isinstance(f, dict) and "path" in f}
@@ -106,6 +111,11 @@ def run(
     run_id: str,
     architecture_plan: str | dict = "",
 ) -> dict:
+    """Генерирует исходный код приложения и проводит self-check для улучшения качества.
+
+    После генерации кода запускает второй проход LLM с чеклистом качества.
+    Если self-check вернул меньше файлов чем сгенерировано — оригинал сохраняется.
+    """
     print("[AgentCoder] starting...")
 
     plan_dict: dict = {}
@@ -135,7 +145,7 @@ def run(
         "README пиши на русском языке."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("coder"))
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("coder"), run_id=run_id)
     files = _parse_files(response)
 
     # Определяем ожидаемые файлы из плана (если он есть), иначе — что вернула модель
@@ -144,7 +154,7 @@ def run(
     if missing:
         print(f"[AgentCoder] WARNING: missing files after parse: {missing}")
 
-    # Self-check: универсальная проверка качества
+    # Второй проход: универсальная проверка качества кода
     print("[AgentCoder] running self-check pass...")
     try:
         src_files = {k: v for k, v in files.items() if k != "README.md"}
@@ -156,9 +166,9 @@ def run(
                 file_markers=_build_file_markers(src_paths),
             ),
             model=get_model("self_check"),
+            run_id=run_id,
         )
         fixed_files = _parse_files(fixed_response)
-        # Применяем только если вернулось не меньше файлов чем было
         returned = set(fixed_files.keys()) - {"README.md"}
         if returned >= set(src_files.keys()):
             for key in src_files:
@@ -167,11 +177,13 @@ def run(
             print("[AgentCoder] self-check applied successfully")
         else:
             print(f"[AgentCoder] WARNING: self-check returned fewer files ({returned} vs {set(src_files.keys())}), keeping original")
+    except CancelledError:
+        raise
     except Exception as e:
         print(f"[AgentCoder] WARNING: self-check failed ({e}), keeping original code")
 
     written: list[str] = []
-    readme_content = files.pop("README.md", "# Приложение\n\nОткройте `src/index.html` в браузере.\n\n## Тесты\n\n```\npytest tests/\n```")
+    readme_content = files.pop("README.md", "# Приложение\n\n## Тесты\n\n```bash\npytest tests/\n```\n")
     for rel_path, content in files.items():
         write_artifact(run_id, f"src/{rel_path}", content)
         written.append(f"src/{rel_path}")
@@ -186,7 +198,7 @@ def run(
 
 
 def fix(functional_req: str, test_output: str, run_id: str) -> None:
-    """Read current src files, ask LLM to fix them based on failed test output, write back."""
+    """Исправляет код по результатам упавших тестов, изменяя только нужные файлы."""
     print("[AgentCoder:fix] reading current src files...")
 
     src_dir = os.path.join("output", run_id, "src")
@@ -224,7 +236,7 @@ def fix(functional_req: str, test_output: str, run_id: str) -> None:
     )
 
     try:
-        response = call_llm(system=system_prompt, user=user_prompt, model=get_model("fixer"))
+        response = call_llm(system=system_prompt, user=user_prompt, model=get_model("fixer"), run_id=run_id)
         fixed = _parse_files(response)
         written = []
         for rel_path, content in fixed.items():
@@ -233,12 +245,14 @@ def fix(functional_req: str, test_output: str, run_id: str) -> None:
             write_artifact(run_id, f"src/{rel_path}", content)
             written.append(rel_path)
         print(f"[AgentCoder:fix] fixed and wrote: {written}")
+    except CancelledError:
+        raise
     except Exception as e:
         print(f"[AgentCoder:fix] WARNING: fix call failed ({e}), keeping original")
 
 
 def patch(instruction: str, run_id: str) -> list[str]:
-    """Apply a targeted instruction (e.g. 'change background color') to existing src files."""
+    """Применяет точечные правки по инструкции пользователя, возвращает список изменённых файлов."""
     print(f"[AgentCoder:patch] instruction: {instruction!r}")
 
     src_dir = os.path.join("output", run_id, "src")
@@ -273,7 +287,7 @@ def patch(instruction: str, run_id: str) -> list[str]:
         "Выводи ТОЛЬКО изменённые файлы."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("patcher"))
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("patcher"), run_id=run_id)
     patched = _parse_files(response)
 
     written = []

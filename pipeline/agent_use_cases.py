@@ -1,3 +1,4 @@
+"""Агент генерации юз-кейсов из бизнес-требований и бизнес-процесса."""
 import os
 from jinja2 import Environment, FileSystemLoader
 from utils.llm_client import call_llm, get_model
@@ -8,6 +9,7 @@ _jinja_env = Environment(loader=FileSystemLoader(_PROMPTS_DIR))
 
 
 def run(bt: str, bp: str, features: str, run_id: str) -> dict:
+    """Генерирует docs/use-cases.md на основе БТ, БП и списка фич."""
     print("[AgentUseCases] starting...")
 
     template = _jinja_env.get_template("use_cases.j2")
@@ -19,7 +21,7 @@ def run(bt: str, bp: str, features: str, run_id: str) -> dict:
         "Выводи только содержимое файла use-cases.md без лишних пояснений."
     )
 
-    use_cases = call_llm(system=system_prompt, user=user_prompt, model=get_model("use_cases"))
+    use_cases = call_llm(system=system_prompt, user=user_prompt, model=get_model("use_cases"), run_id=run_id)
 
     write_artifact(run_id, "docs/use-cases.md", use_cases)
     print("[AgentUseCases] done, wrote: docs/use-cases.md")

@@ -1,3 +1,4 @@
+"""Агент-архитектор: проектирует файловую структуру приложения в формате JSON."""
 import json
 import os
 import re
@@ -10,15 +11,16 @@ _jinja_env = Environment(loader=FileSystemLoader(_PROMPTS_DIR))
 
 
 def _extract_json(text: str) -> str:
-    """Strip markdown fences and extract the first JSON object from text."""
+    """Извлекает JSON из ответа, удаляя возможные markdown-блоки и окружающий текст."""
     text = re.sub(r"^```(?:json)?\s*\n?", "", text.strip(), flags=re.IGNORECASE)
     text = re.sub(r"\n?```\s*$", "", text)
-    # Find the outermost JSON object in case of leading/trailing text
+    # на случай если модель добавила текст вокруг JSON
     match = re.search(r"\{.*\}", text, re.DOTALL)
     return match.group(0) if match else text
 
 
 def run(functional_req: str, non_functional_req: str, features: str, run_id: str) -> dict:
+    """Генерирует docs/architecture.json с планом файловой структуры приложения."""
     print("[AgentArchitect] starting...")
 
     template = _jinja_env.get_template("architect.j2")
@@ -34,12 +36,13 @@ def run(functional_req: str, non_functional_req: str, features: str, run_id: str
         "Никакого текста до или после JSON."
     )
 
-    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("architect"))
+    response = call_llm(system=system_prompt, user=user_prompt, model=get_model("architect"), run_id=run_id)
     raw_json = _extract_json(response)
 
     try:
         plan = json.loads(raw_json)
     except json.JSONDecodeError as e:
+        # Если JSON невалидный — сохраняем сырой текст, кодер справится без структурированного плана
         print(f"[AgentArchitect] WARNING: failed to parse JSON ({e}), using raw text as plan")
         plan = {"raw": raw_json}
 
