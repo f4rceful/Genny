@@ -2,7 +2,7 @@ output/
 .venv/
 __pycache__/
 *.pyc
-other
+other/
 
 # Frontend
 frontend/node_modules/
