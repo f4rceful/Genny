@@ -30,14 +30,34 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Создайте `.env` в корне (минимальная конфигурация):
+Создайте `.env` в корне:
 
 ```env
-OPENROUTER_API_KEY=sk-or-...
-MODEL_DEFAULT=deepseek/deepseek-v3.2
+OPENROUTER_API_KEY=
+
+# Модель по умолчанию (если не задана модель агента)
+MODEL_DEFAULT=google/gemini-3-flash-preview
+# Резервная модель на случай ошибки основной
+MODEL_FALLBACK=deepseek/deepseek-v4-flash
+
+# Модели для каждого агента
+MODEL_USE_CASES=deepseek/deepseek-v4-flash
+MODEL_ANALYST=deepseek/deepseek-v4-flash
+MODEL_ARCHITECT=deepseek/deepseek-v4-flash
+MODEL_CODER=google/gemini-3-flash-preview
+MODEL_TESTER=google/gemini-3-flash-preview
+MODEL_FIXER=google/gemini-3-flash-preview
+MODEL_PATCHER=google/gemini-3-flash-preview
+
+# Максимум попыток автоисправления кода (тесты упали → fix → retry)
+MAX_FIX_ATTEMPTS=3
+
+# Настройки тестового скрипта (test_run.py)
+GENERATOR_BASE_URL=http://localhost:8000
+POLL_INTERVAL=5
+
 ```
 
-Полный список переменных — см. `.env` (модели для каждого агента, параметры запуска).
 
 ---
 
